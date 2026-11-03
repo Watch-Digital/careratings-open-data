@@ -49,6 +49,28 @@ def _catalog_distribution(dataset: dict) -> str | None:
     return None
 
 
+def _catalog_dataset(catalog: dict, title: str) -> dict | None:
+    """Find a data.cms.gov dataset by title.
+
+    data.cms.gov used to list one entry per dataset under its plain title. Since
+    Oct 2026 data.json lists only dated versions ('<title> : 2026-10-01'), so take
+    the exact title if present, else the newest dated version with a CSV.
+    """
+    datasets = catalog.get("dataset", [])
+    exact = next((d for d in datasets if d.get("title") == title), None)
+    if exact is not None:
+        return exact
+    pattern = re.compile(rf"^{re.escape(title)} : (\d{{4}}-\d{{2}}-\d{{2}})$")
+    versions = []
+    for d in datasets:
+        m = pattern.match(d.get("title") or "")
+        if m and _catalog_distribution(d):
+            versions.append((m.group(1), d.get("modified") or "", d))
+    if not versions:
+        return None
+    return max(versions, key=lambda v: (v[0], v[1]))[2]
+
+
 def resolve_sources(session: requests.Session | None = None, catalog_json: dict | None = None,
                     metastore: dict[str, dict] | None = None) -> dict[str, ResolvedSource]:
     """Look up every source. `catalog_json` and `metastore` allow offline tests."""
@@ -71,7 +93,7 @@ def resolve_sources(session: requests.Session | None = None, catalog_json: dict 
                 response = session.get(DATA_CMS_GOV_CATALOG, timeout=120)
                 response.raise_for_status()
                 catalog = response.json()
-            dataset = next((d for d in catalog.get("dataset", []) if d.get("title") == source.title), None)
+            dataset = _catalog_dataset(catalog, source.title)
             if dataset is None:
                 raise RuntimeError(f"data.cms.gov catalog has no dataset titled {source.title!r}")
             url = _catalog_distribution(dataset)
