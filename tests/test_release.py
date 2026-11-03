@@ -238,6 +238,25 @@ def test_catalog_resolution_is_offline_testable():
     assert resolved["chains"].url == "https://y/Chain_Performance.csv" and resolved["all_owners"].modified == "2026-08-17"
 
 
+def test_catalog_picks_newest_dated_version():
+    # data.cms.gov data.json now lists only '<title> : YYYY-MM-DD' entries.
+    def entry(title, modified, filename):
+        return {"title": title, "modified": modified, "distribution": [{"format": "CSV", "downloadURL": f"https://y/{filename}"}]}
+    datasets = []
+    for s in SOURCES.values():
+        if s.pdc_id is None:
+            datasets += [entry(f"{s.title} : 2026-08-01", "2026-09-29", f"old_{s.local_name}"),
+                         entry(f"{s.title} : 2026-10-01", "2026-10-19", f"new_{s.local_name}")]
+    # A sibling dataset whose title only starts with ours must not be picked.
+    datasets.append(entry("Skilled Nursing Facility Change of Ownership - Owner Information : 2026-12-01", "2026-12-02", "owners.csv"))
+    metastore = {s.pdc_id: {"distribution": [{"downloadURL": f"https://x/{s.local_name}"}]} for s in SOURCES.values() if s.pdc_id}
+    resolved = resolve_sources(session=None, catalog_json={"dataset": datasets}, metastore=metastore)
+    for key, s in SOURCES.items():
+        if s.pdc_id is None:
+            assert resolved[key].filename == f"new_{s.local_name}"
+    assert resolved["chow"].modified == "2026-10-19"
+
+
 def test_reconcile_tolerances():
     cms = {"facilities": 14702, "sff": 84, "sff_candidates": 441, "abuse_icons": 1427, "total_fines_dollars": 456761299, "total_fines": 13257, "payment_denials": 2440}
     ours = dict(cms, facilities=14690, total_fines_dollars=480_000_000)
