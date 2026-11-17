@@ -24,8 +24,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
           cache: pip
@@ -55,7 +55,7 @@ jobs:
           python -m tcr_open_data.cli publish --release "releases/${{ steps.build.outputs.release }}" --raw "raw/${{ steps.build.outputs.release }}" --live
 
       - name: Keep the release as a workflow artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ${{ steps.build.outputs.release }}
           path: releases/${{ steps.build.outputs.release }}
